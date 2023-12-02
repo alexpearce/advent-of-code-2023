@@ -15,7 +15,10 @@ defmodule Solution do
 
   def part2 do
     input()
-    nil
+    |> Enum.map(&extract/1)
+    |> Enum.map(&aggregate_counts/1)
+    |> Enum.map(&cube_power/1)
+    |> Enum.sum()
   end
 
   defp input do
@@ -64,6 +67,10 @@ defmodule Solution do
     data.red_counts <= max_red &&
       data.green_counts <= max_green &&
       data.blue_counts <= max_blue
+  end
+
+  defp cube_power(data) do
+    data.red_counts * data.green_counts * data.blue_counts
   end
 end
 
