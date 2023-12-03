@@ -1,6 +1,7 @@
 defmodule Solution do
   @numeric_characters MapSet.new(~w"0 1 2 3 4 5 6 7 8 9")
   @non_symbol_characters MapSet.union(@numeric_characters, MapSet.new(~w"."))
+  @gear_character "*"
 
   def part1 do
     # Build a map of coordinate to value.
@@ -20,8 +21,30 @@ defmodule Solution do
   end
 
   def part2 do
-    input()
-    nil
+    {{n_rows, n_cols}, grid} =
+      input()
+      |> create_grid()
+
+    # Build a map of coordinates to adjacent gears, if any.
+    adjacent_gear_map = create_adjacent_gear_map(grid)
+
+    # Extract all part numbers which have at least one digit adjacent to a gear,
+    # and map each gear to those numbers.
+    part_numbers_with_adjacent_gears =
+      extract_gear_adjacent_part_numbers(grid, {n_rows, n_cols}, adjacent_gear_map)
+
+    # Map gear coordinates to a list of all adjacent part numbers.
+    gears_with_adjacent_numbers =
+      group_part_numbers_by_adjacent_gears(part_numbers_with_adjacent_gears)
+
+    # Multiply part numbers adjacent to the same gear.
+    # Seems like the puzzle input guarantees at most two parts adjacent to one
+    # gear.
+    Enum.map(gears_with_adjacent_numbers, fn
+      {_gear_coord, [part_a, part_b]} -> part_a * part_b
+      {_gear_coord, _parts} -> 0
+    end)
+    |> Enum.sum()
   end
 
   defp input do
@@ -52,14 +75,29 @@ defmodule Solution do
         if MapSet.member?(@non_symbol_characters, character) do
           %{}
         else
-          create_adjacent_mask(coord)
+          create_adjacent_mask(coord, true)
         end
 
       Map.merge(mask, local_mask)
     end)
   end
 
-  defp create_adjacent_mask({row, column}) do
+  defp create_adjacent_gear_map(grid) do
+    mask = for {key, _value} <- grid, into: %{}, do: {key, nil}
+
+    Enum.reduce(grid, mask, fn {coord, character}, mask ->
+      local_mask =
+        if character == @gear_character do
+          create_adjacent_mask(coord, coord)
+        else
+          %{}
+        end
+
+      Map.merge(mask, local_mask)
+    end)
+  end
+
+  defp create_adjacent_mask({row, column}, value) do
     coords = [
       {row - 1, column - 1},
       {row - 1, column},
@@ -71,7 +109,7 @@ defmodule Solution do
       {row + 1, column + 1}
     ]
 
-    for coord <- coords, into: %{}, do: {coord, true}
+    for coord <- coords, into: %{}, do: {coord, value}
   end
 
   defp extract_part_numbers(grid, {n_rows, n_cols}, mask) do
@@ -90,7 +128,7 @@ defmodule Solution do
           {current, masked} =
             if MapSet.member?(@numeric_characters, character) do
               current = 10 * current + String.to_integer(character)
-              masked = masked || mask[{row, col}]
+              masked = masked or mask[{row, col}]
               {current, masked}
             else
               {0, false}
@@ -104,6 +142,53 @@ defmodule Solution do
       else
         nums
       end
+    end)
+  end
+
+  defp extract_gear_adjacent_part_numbers(grid, {n_rows, n_cols}, adjacent_gear_map) do
+    Enum.flat_map(0..(n_rows - 1), fn row ->
+      {nums, final, adjacent_gear} =
+        Enum.reduce(0..(n_cols - 1), {[], 0, nil}, fn col, {nums, current, adjacent_gear} ->
+          character = grid[{row, col}]
+
+          nums =
+            if not MapSet.member?(@numeric_characters, character) do
+              if current > 0 and not is_nil(adjacent_gear),
+                do: [{current, adjacent_gear} | nums],
+                else: nums
+            else
+              nums
+            end
+
+          {current, adjacent_gear} =
+            if MapSet.member?(@numeric_characters, character) do
+              current = 10 * current + String.to_integer(character)
+              adjacent_gear = adjacent_gear || adjacent_gear_map[{row, col}]
+              {current, adjacent_gear}
+            else
+              {0, nil}
+            end
+
+          {nums, current, adjacent_gear}
+        end)
+
+      if final > 0 and not is_nil(adjacent_gear) do
+        [{final, adjacent_gear} | nums]
+      else
+        nums
+      end
+    end)
+  end
+
+  defp group_part_numbers_by_adjacent_gears(part_numbers_with_adjacent_gears) do
+    Enum.reduce(part_numbers_with_adjacent_gears, %{}, fn {part_number, gear_coord}, acc ->
+      {_, acc} =
+        Map.get_and_update(acc, gear_coord, fn
+          nil -> {nil, [part_number]}
+          parts -> {parts, [part_number | parts]}
+        end)
+
+      acc
     end)
   end
 end
