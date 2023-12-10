@@ -7,7 +7,8 @@ defmodule Solution do
 
   def part2 do
     input()
-    nil
+    |> Enum.map(&compute_previous_value/1)
+    |> Enum.sum()
   end
 
   defp input do
@@ -25,11 +26,11 @@ defmodule Solution do
     last_value = List.last(values)
 
     values
-    |> do_compute([last_value])
+    |> do_compute_next([last_value])
     |> Enum.sum()
   end
 
-  defp do_compute(values, last_values) do
+  defp do_compute_next(values, last_values) do
     if Enum.all?(values, fn value -> value == 0 end) do
       last_values
     else
@@ -42,7 +43,31 @@ defmodule Solution do
 
       last_values = [last_value | last_values]
 
-      do_compute(Enum.reverse(reduced), last_values)
+      do_compute_next(Enum.reverse(reduced), last_values)
+    end
+  end
+
+  defp compute_previous_value([first_value | _tail] = values) do
+    [head | tail] = do_compute_previous(values, [first_value])
+
+    Enum.reduce(tail, head, &Kernel.-/2)
+  end
+
+  defp do_compute_previous(values, first_values) do
+    if Enum.all?(values, fn value -> value == 0 end) do
+      first_values
+    else
+      [_head | tail] = values
+
+      [first_value | _] =
+        reduced =
+        Enum.zip(values, tail)
+        |> Enum.reduce([], fn {a, b}, lst -> [b - a | lst] end)
+        |> Enum.reverse()
+
+      first_values = [first_value | first_values]
+
+      do_compute_previous(reduced, first_values)
     end
   end
 end
