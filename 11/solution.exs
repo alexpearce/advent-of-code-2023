@@ -3,17 +3,11 @@ defmodule Solution do
   @galaxy "#"
 
   def part1 do
-    input()
-    |> apply_expansion()
-    |> find_galaxies()
-    |> pairs()
-    |> Enum.map(&manhattan_distance/1)
-    |> Enum.sum()
+    solve(input(), 2)
   end
 
   def part2 do
-    input()
-    nil
+    solve(input(), 1_000_000)
   end
 
   defp input do
@@ -23,22 +17,27 @@ defmodule Solution do
     |> Enum.map(&String.graphemes/1)
   end
 
-  defp apply_expansion(lines) do
+  defp solve(lines, expansion_factor) do
+    empty_rows = find_empty(lines)
+    empty_columns = find_empty(transpose(lines))
+
     lines
-    |> expand_empty_lines()
-    |> transpose()
-    |> expand_empty_lines()
-    |> transpose()
+    |> find_galaxies()
+    |> pairs()
+    |> Enum.map(
+      &manhattan_distance_with_expansion(&1, empty_rows, empty_columns, expansion_factor)
+    )
+    |> Enum.sum()
   end
 
-  defp expand_empty_lines(lines) do
-    Enum.reduce(lines, [], fn line, acc ->
-      if Enum.all?(line, &Kernel.==(&1, @space)) do
-        [line, line | acc]
-      else
-        [line | acc]
-      end
+  defp find_empty(lines) do
+    lines
+    |> Enum.with_index()
+    |> Enum.map(fn {line, index} ->
+      empty? = Enum.all?(line, &Kernel.==(&1, @space))
+      {index, empty?}
     end)
+    |> Enum.into(%{})
   end
 
   defp transpose(lines) do
@@ -63,8 +62,35 @@ defmodule Solution do
     end
   end
 
-  defp manhattan_distance({{x1, y1}, {x2, y2}}) do
-    abs(x1 - x2) + abs(y1 - y2)
+  defp manhattan_distance_with_expansion(
+         {{x1, y1}, {x2, y2}},
+         empty_rows,
+         empty_columns,
+         expansion_factor
+       ) do
+    x =
+      for x <- range(x1, x2), reduce: 0 do
+        acc ->
+          distance = if empty_rows[x], do: expansion_factor, else: 1
+          acc + distance
+      end
+
+    y =
+      for y <- range(y1, y2), reduce: 0 do
+        acc ->
+          distance = if empty_columns[y], do: expansion_factor, else: 1
+          acc + distance
+      end
+
+    x + y
+  end
+
+  defp range(a, b) when a == b, do: []
+
+  defp range(a, b) when a > b, do: range(b, a)
+
+  defp range(a, b) do
+    a..(b - 1)
   end
 end
 
