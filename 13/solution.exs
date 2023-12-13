@@ -1,18 +1,12 @@
 defmodule Solution do
   def part1 do
     input()
-    |> Enum.chunk_by(fn line -> line == "" end)
-    |> Enum.filter(fn chunk -> chunk != [""] end)
-    |> Enum.map(&find_split/1)
-    |> Enum.reduce(0, fn
-      {:vertical, split}, acc -> acc + split
-      {:horizontal, split}, acc -> acc + 100 * split
-    end)
+    |> solve(0)
   end
 
   def part2 do
     input()
-    nil
+    |> solve(1)
   end
 
   defp input do
@@ -21,30 +15,41 @@ defmodule Solution do
     |> String.split("\n")
   end
 
-  defp find_split(lines) do
-    case do_find_split(lines) do
+  defp solve(lines, allowed_differences) do
+    lines
+    |> Enum.chunk_by(fn line -> line == "" end)
+    |> Enum.filter(fn chunk -> chunk != [""] end)
+    |> Enum.map(&find_split(&1, allowed_differences))
+    |> Enum.reduce(0, fn
+      {:vertical, split}, acc -> acc + split
+      {:horizontal, split}, acc -> acc + 100 * split
+    end)
+  end
+
+  defp find_split(lines, allowed_differences) do
+    case do_find_split(lines, allowed_differences) do
       nil ->
-        {:vertical, do_find_split(transpose(lines))}
+        {:vertical, do_find_split(transpose(lines), allowed_differences)}
 
       index ->
         {:horizontal, index}
     end
   end
 
-  defp do_find_split([]), do: nil
-
-  defp do_find_split(lines) do
+  defp do_find_split(lines, allowed_differences) do
     num_lines = Enum.count(lines)
 
     Enum.reduce_while(1..(num_lines - 1), nil, fn split, _result ->
       {left, right} = Enum.split(lines, split)
 
-      left
-      |> Enum.reverse()
-      |> Enum.zip(right)
-      |> Enum.map(fn {a, b} -> a == b end)
-      |> Enum.all?()
-      |> if do
+      num_differences =
+        left
+        |> Enum.reverse()
+        |> Enum.zip(right)
+        |> Enum.map(&differences/1)
+        |> Enum.sum()
+
+      if num_differences == allowed_differences do
         {:halt, split}
       else
         {:cont, nil}
@@ -58,6 +63,14 @@ defmodule Solution do
     |> List.zip()
     |> Enum.map(&Tuple.to_list/1)
     |> Enum.map(&Enum.join/1)
+  end
+
+  defp differences({a, b}) do
+    Enum.zip(String.graphemes(a), String.graphemes(b))
+    |> Enum.map(fn {i, j} ->
+      if i != j, do: 1, else: 0
+    end)
+    |> Enum.sum()
   end
 end
 
