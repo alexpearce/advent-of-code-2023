@@ -5,15 +5,56 @@ defmodule Solution do
 
   def part1 do
     input()
-    |> transpose()
-    |> Enum.map(&shift_rocks/1)
-    |> transpose()
+    |> tilt_platform(:north)
     |> score()
   end
 
   def part2 do
-    input()
-    nil
+    platform = input()
+
+    cache = %{platform => 0}
+
+    # After manual inspection of the scores after each cycle, it appears that
+    # there is a cycle, or continuous loop, within the scores. That is after an
+    # initial number of platform cycles, the score progresses through the same
+    # series of values infinitely.
+    #
+    # This presumably means the same platform configurations keep appearing. We
+    # will find the initial number of platform cycles before entering the loop
+    # as well as the length of loop, which is the number of platform cycles after
+    # entering the loop until we reach the same platform configuration.
+    {cycle_start, cycle_end} =
+      Enum.reduce_while(1..1_000, {platform, cache}, fn index, {prev_platform, cache} ->
+        cycled_platform = cycle_platform(prev_platform)
+
+        case Map.get(cache, cycled_platform) do
+          nil ->
+            {:cont, {cycled_platform, Map.put(cache, cycled_platform, index)}}
+
+          prev_index ->
+            {:halt, {prev_index, index}}
+        end
+      end)
+
+    # The cycle length is the number of iterations between entering the loop and
+    # revisiting the loop start.
+    cycle_length = cycle_end - cycle_start
+    # Once we have entered the loop, we have this many steps left going round
+    # and round until we reach the 1-billion-iteration target.
+    steps_in_cycle = 1_000_000_000 - cycle_start
+    # But because we have a loop, we don't need to repeat the computation
+    # `steps_in_cycle` times; we can just compute the offset into the loop we'd
+    # be after a billion iterations and compute up to that offset.
+    steps_left_in_cycle = rem(steps_in_cycle, cycle_length)
+    total_steps = cycle_start + steps_left_in_cycle
+
+    # Iterate through cycles up to the loop offset. There's no need to keep
+    # going after this, as we'll end up at the same platform configuration after
+    # 1 billion iterations.
+    Enum.reduce(1..total_steps, platform, fn _index, prev_platform ->
+      cycle_platform(prev_platform)
+    end)
+    |> score()
   end
 
   defp input do
@@ -22,6 +63,41 @@ defmodule Solution do
     |> String.trim()
     |> String.split("\n")
     |> Enum.map(&String.graphemes/1)
+  end
+
+  defp cycle_platform(lines) do
+    lines
+    |> tilt_platform(:north)
+    |> tilt_platform(:west)
+    |> tilt_platform(:south)
+    |> tilt_platform(:east)
+  end
+
+  defp tilt_platform(lines, :north) do
+    lines
+    |> transpose()
+    |> Enum.map(&shift_rocks/1)
+    |> transpose()
+  end
+
+  defp tilt_platform(lines, :south) do
+    lines
+    |> transpose()
+    |> Enum.map(&Enum.reverse/1)
+    |> Enum.map(&shift_rocks/1)
+    |> Enum.map(&Enum.reverse/1)
+    |> transpose()
+  end
+
+  defp tilt_platform(lines, :east) do
+    lines
+    |> Enum.map(&Enum.reverse/1)
+    |> tilt_platform(:west)
+    |> Enum.map(&Enum.reverse/1)
+  end
+
+  defp tilt_platform(lines, :west) do
+    Enum.map(lines, &shift_rocks/1)
   end
 
   defp shift_rocks(line) do
