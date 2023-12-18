@@ -12,8 +12,41 @@ defmodule Solution do
   end
 
   def part2 do
-    input()
-    nil
+    map = input()
+
+    {num_rows, num_cols} = dimensions(map)
+
+    from_left =
+      for row <- 0..(num_rows - 1) do
+        map
+        |> traverse([{{row, 0}, :east}], %{})
+        |> count_energized()
+      end
+
+    from_right =
+      for row <- 0..(num_rows - 1) do
+        map
+        |> traverse([{{row, num_cols - 1}, :west}], %{})
+        |> count_energized()
+      end
+
+    from_top =
+      for col <- 0..(num_cols - 1) do
+        map
+        |> traverse([{{0, col}, :south}], %{})
+        |> count_energized()
+      end
+
+    from_bottom =
+      for col <- 0..(num_cols - 1) do
+        map
+        |> traverse([{{num_rows - 1, col}, :north}], %{})
+        |> count_energized()
+      end
+
+    [from_left, from_right, from_top, from_bottom]
+    |> Enum.concat()
+    |> Enum.max()
   end
 
   defp input do
@@ -28,6 +61,16 @@ defmodule Solution do
       |> Enum.map(fn {character, col} -> {{row, col}, character} end)
     end)
     |> Enum.into(%{})
+  end
+
+  defp dimensions(map) do
+    # Assume square grid.
+    {max_row_index, max_col_index} =
+      map
+      |> Enum.map(fn {{row, col}, _dir} -> {row, col} end)
+      |> Enum.max()
+
+    {max_row_index + 1, max_col_index + 1}
   end
 
   defp traverse(_map, [], seen), do: seen
