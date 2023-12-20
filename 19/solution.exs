@@ -1,27 +1,27 @@
 defmodule Solution do
   def part1 do
-    [workflows, [""], parts] =
-      input()
-      |> Enum.chunk_by(&(&1 == ""))
-
-    workflows = parse_workflows(workflows)
+    {parts, workflows} = input()
 
     parts
-    |> parse_parts()
     |> Enum.filter(&accept?(&1, workflows))
     |> Enum.map(&compute_score/1)
     |> Enum.sum()
   end
 
   def part2 do
-    input()
-    nil
+    {_parts, workflows} = input()
+    ranges = %{"x" => {1, 4000}, "m" => {1, 4000}, "a" => {1, 4000}, "s" => {1, 4000}}
+    find_acceptance(ranges, workflows)
   end
 
   defp input do
-    File.read!("19/input.txt")
-    |> String.trim()
-    |> String.split("\n")
+    [workflows, [""], parts] =
+      File.read!("19/input.txt")
+      |> String.trim()
+      |> String.split("\n")
+      |> Enum.chunk_by(&(&1 == ""))
+
+    {parse_parts(parts), parse_workflows(workflows)}
   end
 
   defp parse_workflows(workflows) do
@@ -124,6 +124,62 @@ defmodule Solution do
     |> Map.values()
     |> Enum.sum()
   end
+
+  defp find_acceptance(ranges, workflows) do
+    start = workflows["in"]
+
+    step_ranges(ranges, start, workflows)
+  end
+
+  defp step_ranges(ranges, [:accept | _steps], _workflows) do
+    ranges
+    |> Enum.map(fn {_key, {lo, hi}} -> 1 + hi - lo end)
+    |> Enum.product()
+  end
+
+  defp step_ranges(_ranges, [:reject | _steps], _workflows),
+    do: 0
+
+  defp step_ranges(ranges, [{:goto, workflow} | _steps], workflows) do
+    step_ranges(ranges, workflows[workflow], workflows)
+  end
+
+  defp step_ranges(ranges, [{:test, predicate, on_success} | steps], workflows) do
+    {failure_ranges, success_ranges} = split_ranges(ranges, predicate)
+    having_failed = step_ranges(failure_ranges, steps, workflows)
+    having_succeeded = step_ranges(success_ranges, [on_success], workflows)
+    having_failed + having_succeeded
+  end
+
+  defp split_ranges(ranges, predicate) do
+    %{"var" => var} = predicate
+    {failure_range, success_range} = split_range(ranges[var], predicate)
+    {%{ranges | var => failure_range}, %{ranges | var => success_range}}
+  end
+
+  defp split_range({}, _predicate), do: {{}, {}}
+
+  defp split_range(range, predicate) do
+    {lo, hi} = range
+    %{"op" => op, "val" => val} = predicate
+
+    case op do
+      :greater_than ->
+        {
+          create_range(lo, min(hi, val)),
+          create_range(max(lo, val + 1), hi)
+        }
+
+      :less_than ->
+        {
+          create_range(max(lo, val), hi),
+          create_range(lo, min(hi, val - 1))
+        }
+    end
+  end
+
+  defp create_range(lo, hi) when not lo < hi, do: {}
+  defp create_range(lo, hi), do: {lo, hi}
 end
 
 part1 = Solution.part1()
